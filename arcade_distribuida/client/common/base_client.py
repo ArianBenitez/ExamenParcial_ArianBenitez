@@ -127,16 +127,16 @@ def display_top_times(game_key):
 def run_menu():
     while True:
         choice = show_menu(MAIN_OPTIONS, title="Máquina Arcade Distribuida")
-        if choice == "N‑Reinas":
+        if choice == "NReinas":
             nreinas_main()
-        elif choice == "Knight’s Tour":
+        elif choice == "Knights Tour":
             caballo_main()
         elif choice == "Torres de Hanói":
             hanoi_main()
         elif choice == "Ver mejores tiempos":
             # Submenú para elegir juego
             juego = show_menu(
-                ["N‑Reinas", "Knight’s Tour", "Torres de Hanói", "Volver"],
+                ["NReinas", "Knights Tour", "Torres de Hanoi", "Volver"],
                 title="Selecciona juego",
                 prompt="Consultar top 5"
             )
