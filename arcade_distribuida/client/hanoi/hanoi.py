@@ -59,7 +59,7 @@ def main():
 
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-    pygame.display.set_caption("Torres de Hanói")
+    pygame.display.set_caption("Torres de Hanoi")
     clock = pygame.time.Clock()
 
     towers = [list(range(NUM_DISKS, 0, -1)), [], []]

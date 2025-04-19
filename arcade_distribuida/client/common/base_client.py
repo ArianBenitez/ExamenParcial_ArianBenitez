@@ -11,7 +11,7 @@ WINDOW_WIDTH, WINDOW_HEIGHT = 600, 400
 FPS = 60
 
 MAIN_OPTIONS = [
-    "N‑Reinas",
+    "NReinas",
     "Knight’s Tour",
     "Torres de Hanói",
     "Ver mejores tiempos",
@@ -19,7 +19,7 @@ MAIN_OPTIONS = [
 ]
 
 GAMES = {
-    "N‑Reinas": "nreinas",
+    "NReinas": "nreinas",
     "Knight’s Tour": "caballo",
     "Torres de Hanói": "hanoi"
 }
@@ -49,7 +49,7 @@ def show_menu(options, title="Menú", prompt=None):
                     selected = (selected - 1) % len(options)
                 elif evt.key == pygame.K_RETURN:
                     choice = options[selected]
-                    pygame.quit()      # <— cerrar antes de devolver
+                    pygame.quit()
                     return choice
 
         screen.fill((30, 30, 30))
@@ -70,10 +70,10 @@ def show_menu(options, title="Menú", prompt=None):
 
 def display_top_times(game_key):
     """
-    Consulta al servidor los mejores tiempos para el juego y los muestra hasta que el
-    usuario pulse una tecla o cierre la ventana.
+    Consulta al servidor los mejores tiempos para el juego indicado
+    y los muestra en pantalla tipo tabla con fuente monoespaciada.
     """
-    # Llamada al servidor
+    # Petición al servidor
     msg = {
         "juego": GAMES[game_key],
         "acción": "solicitar_mejores",
@@ -86,42 +86,55 @@ def display_top_times(game_key):
         mejores = []
         error_text = f"Error de red: {e}"
 
-    # Formateo de líneas
-    lines = []
+    # Preparar líneas de la “tabla”
+    header = []
+    rows = []
     if mejores:
-        lines.append(f"Top 5 de {game_key}")
-        for i, entry in enumerate(mejores, start=1):
-            if game_key == "N‑Reinas":
-                info = f"{i}. N={entry['N']} ➔ intentos={entry['intentos']} @ {entry['timestamp']}"
-            else:
+        if game_key == "NReinas":
+            header = ["#"," N ","Intentos"," Fecha"]
+            for i, entry in enumerate(mejores, start=1):
+                rows.append(f"{i:>2}   {entry['N']:<3}     {entry['intentos']:<8} {entry['timestamp']}")
+        else:
+            header = ["#","Movs"," Fecha"]
+            for i, entry in enumerate(mejores, start=1):
                 movs = entry.get("movimientos", entry.get("intentos", "?"))
-                info = f"{i}. movs={movs} @ {entry['timestamp']}"
-            lines.append(info)
+                rows.append(f"{i:>2}   {movs:<5}  {entry['timestamp']}")
     else:
-        lines.append("No hay datos de mejores tiempos.")
+        header = ["No hay datos de mejores tiempos."]
         if 'error_text' in locals():
-            lines.append(error_text)
+            rows = [error_text]
 
-    # Mostrar en pantalla
+    # Mostrar en Pygame
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-    pygame.display.set_caption(f"Mejores tiempos: {game_key}")
+    pygame.display.set_caption(f"Top 5 – {game_key}")
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont(None, 28)
+    font = pygame.font.SysFont("Courier", 24)  # monoespaciada
 
     while True:
         for evt in pygame.event.get():
             if evt.type in (pygame.QUIT, pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN):
-                pygame.quit()    # <— cerrar antes de volver
+                pygame.quit()
                 return
 
-        screen.fill((50, 50, 50))
-        for idx, line in enumerate(lines):
-            txt = font.render(line, True, (255, 255, 255))
-            screen.blit(txt, (20, 20 + idx * 30))
+        screen.fill((30, 30, 30))
+        y = 20
 
-        prompt = font.render("Pulsa cualquier tecla para volver", True, (200, 200, 200))
-        screen.blit(prompt, (20, WINDOW_HEIGHT - 40))
+        # Render encabezado si hay filas
+        if rows:
+            hdr_surf = font.render("  ".join(header), True, (255, 215, 0))
+            screen.blit(hdr_surf, (20, y))
+            y += 40
+
+        # Render filas
+        for line in rows:
+            txt_surf = font.render(line, True, (255, 255, 255))
+            screen.blit(txt_surf, (20, y))
+            y += 30  # espacio vertical entre filas
+
+        # Pie indicación
+        tip = font.render("Pulsa cualquier tecla para volver", True, (200, 200, 200))
+        screen.blit(tip, (20, WINDOW_HEIGHT - 40))
 
         pygame.display.flip()
         clock.tick(FPS)
@@ -129,7 +142,7 @@ def display_top_times(game_key):
 def run_menu():
     while True:
         choice = show_menu(MAIN_OPTIONS, title="Máquina Arcade Distribuida")
-        if choice == "N‑Reinas":
+        if choice == "NReinas":
             nreinas_main()
         elif choice == "Knight’s Tour":
             caballo_main()
@@ -137,13 +150,13 @@ def run_menu():
             hanoi_main()
         elif choice == "Ver mejores tiempos":
             sel = show_menu(
-                ["N‑Reinas", "Knight’s Tour", "Torres de Hanói", "Volver"],
+                ["NReinas", "Knight’s Tour", "Torres de Hanói", "Volver"],
                 title="Selecciona juego",
                 prompt="Consultar top 5"
             )
             if sel in GAMES:
                 display_top_times(sel)
-            # si sel == "Volver", loop regresa automáticamente
+            # si sel == "Volver", regresa automáticamente
         else:  # "Salir"
             sys.exit()
 

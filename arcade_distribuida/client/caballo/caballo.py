@@ -52,7 +52,7 @@ def coord_to_notation(pos):
 def main():
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_SIZE, WINDOW_SIZE + 40))
-    pygame.display.set_caption("Knight’s Tour")
+    pygame.display.set_caption("Knights Tour")
     clock = pygame.time.Clock()
 
     visited = set()

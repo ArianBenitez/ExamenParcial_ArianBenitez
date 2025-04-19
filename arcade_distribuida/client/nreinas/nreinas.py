@@ -45,7 +45,7 @@ def es_valido(pos, reinas):
 def main():
     # ——> Mover aquí el input
     try:
-        N = int(input("Introduce el valor de N para el puzzle de las N‑Reinas: "))
+        N = int(input("Introduce el valor de N para el puzzle de las NReinas: "))
         assert N > 0
     except Exception:
         print("Valor de N inválido. Saliendo.")
@@ -56,7 +56,7 @@ def main():
 
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_SIZE, WINDOW_SIZE + MESSAGE_HEIGHT))
-    pygame.display.set_caption(f"N‑Reinas (N={N})")
+    pygame.display.set_caption(f"NReinas (N={N})")
     clock = pygame.time.Clock()
 
     reinas = set()
