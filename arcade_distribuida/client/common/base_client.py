@@ -27,6 +27,7 @@ GAMES = {
 def show_menu(options, title="Menú", prompt=None):
     """
     Muestra un menú con las opciones dadas y devuelve la seleccionada.
+    Cierra pygame justo antes de devolver.
     """
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -48,6 +49,7 @@ def show_menu(options, title="Menú", prompt=None):
                     selected = (selected - 1) % len(options)
                 elif evt.key == pygame.K_RETURN:
                     choice = options[selected]
+                    pygame.quit()      # <— cerrar antes de devolver
                     return choice
 
         screen.fill((30, 30, 30))
@@ -68,10 +70,10 @@ def show_menu(options, title="Menú", prompt=None):
 
 def display_top_times(game_key):
     """
-    Consulta al servidor los mejores tiempos para el juego indicado
-    y los muestra en pantalla hasta que el usuario pulse una tecla.
+    Consulta al servidor los mejores tiempos para el juego y los muestra hasta que el
+    usuario pulse una tecla o cierre la ventana.
     """
-    # Construir mensaje y consultar
+    # Llamada al servidor
     msg = {
         "juego": GAMES[game_key],
         "acción": "solicitar_mejores",
@@ -84,12 +86,11 @@ def display_top_times(game_key):
         mejores = []
         error_text = f"Error de red: {e}"
 
-    # Preparar texto a mostrar
+    # Formateo de líneas
     lines = []
     if mejores:
         lines.append(f"Top 5 de {game_key}")
         for i, entry in enumerate(mejores, start=1):
-            # entry es dict con columnas de la tabla
             if game_key == "N‑Reinas":
                 info = f"{i}. N={entry['N']} ➔ intentos={entry['intentos']} @ {entry['timestamp']}"
             else:
@@ -101,7 +102,7 @@ def display_top_times(game_key):
         if 'error_text' in locals():
             lines.append(error_text)
 
-    # Mostrar en Pygame
+    # Mostrar en pantalla
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     pygame.display.set_caption(f"Mejores tiempos: {game_key}")
@@ -111,7 +112,8 @@ def display_top_times(game_key):
     while True:
         for evt in pygame.event.get():
             if evt.type in (pygame.QUIT, pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN):
-                return  # volver al menú principal
+                pygame.quit()    # <— cerrar antes de volver
+                return
 
         screen.fill((50, 50, 50))
         for idx, line in enumerate(lines):
@@ -127,24 +129,22 @@ def display_top_times(game_key):
 def run_menu():
     while True:
         choice = show_menu(MAIN_OPTIONS, title="Máquina Arcade Distribuida")
-        if choice == "NReinas":
+        if choice == "N‑Reinas":
             nreinas_main()
-        elif choice == "Knights Tour":
+        elif choice == "Knight’s Tour":
             caballo_main()
         elif choice == "Torres de Hanói":
             hanoi_main()
         elif choice == "Ver mejores tiempos":
-            # Submenú para elegir juego
-            juego = show_menu(
-                ["NReinas", "Knights Tour", "Torres de Hanoi", "Volver"],
+            sel = show_menu(
+                ["N‑Reinas", "Knight’s Tour", "Torres de Hanói", "Volver"],
                 title="Selecciona juego",
                 prompt="Consultar top 5"
             )
-            if juego in GAMES:
-                display_top_times(juego)
-            # si elige "Volver", simplemente regresa al menú principal
+            if sel in GAMES:
+                display_top_times(sel)
+            # si sel == "Volver", loop regresa automáticamente
         else:  # "Salir"
-            pygame.quit()
             sys.exit()
 
 if __name__ == "__main__":

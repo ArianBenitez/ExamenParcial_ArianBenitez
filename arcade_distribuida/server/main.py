@@ -33,6 +33,7 @@ def handle_client(conn, addr):
                         "timestamp": datetime.utcnow().isoformat() + "Z",
                         "mensaje": "Resultado guardado"
                     }
+
                 elif acción == "solicitar_mejores":
                     top = consultar_top(msg["juego"])
                     resp = {
@@ -41,6 +42,7 @@ def handle_client(conn, addr):
                         "timestamp": datetime.utcnow().isoformat() + "Z",
                         "mejores": top
                     }
+
                 else:
                     resp = {
                         "acción": "error",
@@ -107,10 +109,18 @@ def consultar_top(juego: str, limit: int = 5):
         sesión.close()
         raise ValueError("Juego no reconocido")
 
-    resultado = [
-        {col.name: getattr(r, col.name) for col in r.__table__.columns}
-        for r in q
-    ]
+    resultado = []
+    for r in q:
+        entry = {}
+        for col in r.__table__.columns:
+            val = getattr(r, col.name)
+            # Serializar datetime a ISO
+            if isinstance(val, datetime):
+                entry[col.name] = val.isoformat() + "Z"
+            else:
+                entry[col.name] = val
+        resultado.append(entry)
+
     sesión.close()
     return resultado
 

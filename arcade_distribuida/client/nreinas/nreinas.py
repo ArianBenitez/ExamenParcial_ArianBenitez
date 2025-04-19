@@ -4,18 +4,8 @@ from datetime import datetime
 from client.common.communication import send_and_receive
 from client.common.threading_utils import run_async
 
-# Configuración inicial: pedir N por consola
-try:
-    N = int(input("Introduce el valor de N para el puzzle de las N-Reinas: "))
-    assert N > 0
-except Exception:
-    print("Valor de N inválido. Saliendo.")
-    sys.exit(1)
-
-# Tamaño de ventana dinámico según N
+# Constantes de configuración
 WINDOW_SIZE = 600
-BOARD_SIZE = N
-TILE_SIZE = WINDOW_SIZE // BOARD_SIZE
 FPS = 60
 MESSAGE_HEIGHT = 40
 
@@ -29,9 +19,6 @@ GREEN = (34, 139, 34)
 
 @run_async
 def enviar_resultado(N, movimientos, resuelto):
-    """
-    Envía el resultado al servidor sin bloquear la GUI.
-    """
     mensaje = {
         "juego": "nreinas",
         "acción": "guardar_resultado",
@@ -49,10 +36,6 @@ def enviar_resultado(N, movimientos, resuelto):
         print("Error al enviar resultado:", e)
 
 def es_valido(pos, reinas):
-    """
-    Comprueba que colocar reina en pos no entra en conflicto
-    con las ya existentes.
-    """
     x0, y0 = pos
     for x1, y1 in reinas:
         if x0 == x1 or y0 == y1 or abs(x0 - x1) == abs(y0 - y1):
@@ -60,9 +43,20 @@ def es_valido(pos, reinas):
     return True
 
 def main():
+    # ——> Mover aquí el input
+    try:
+        N = int(input("Introduce el valor de N para el puzzle de las N‑Reinas: "))
+        assert N > 0
+    except Exception:
+        print("Valor de N inválido. Saliendo.")
+        sys.exit(1)
+
+    BOARD_SIZE = N
+    TILE_SIZE = WINDOW_SIZE // BOARD_SIZE
+
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_SIZE, WINDOW_SIZE + MESSAGE_HEIGHT))
-    pygame.display.set_caption(f"N-Reinas (N={N})")
+    pygame.display.set_caption(f"N‑Reinas (N={N})")
     clock = pygame.time.Clock()
 
     reinas = set()
@@ -73,7 +67,6 @@ def main():
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                # Enviar resultado incompleto si no se resolvió
                 if not finished:
                     enviar_resultado(N, move_count, False)
                 pygame.quit()
@@ -86,7 +79,6 @@ def main():
                     row = my // TILE_SIZE
                     pos = (col, row)
                     if event.button == 1:
-                        # Izquierdo: intentar colocar
                         if pos not in reinas:
                             if es_valido(pos, reinas):
                                 reinas.add(pos)
@@ -102,7 +94,6 @@ def main():
                         else:
                             message = "Ya hay reina ahí"
                     elif event.button == 3:
-                        # Derecho: remover reina
                         if pos in reinas:
                             reinas.remove(pos)
                             message = f"Reinas: {len(reinas)} / {N}"
@@ -111,7 +102,6 @@ def main():
 
         # Dibujado
         screen.fill(BLACK)
-        # Tablero
         for r in range(BOARD_SIZE):
             for c in range(BOARD_SIZE):
                 rect = pygame.Rect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE)
@@ -120,13 +110,12 @@ def main():
                 if (c, r) in reinas:
                     center = rect.center
                     pygame.draw.circle(screen, BLUE, center, TILE_SIZE // 3)
-        # Mensaje inferior
+
         font = pygame.font.SysFont(None, 24)
-        text_color = RED if "Conflicto" in message or "invalid" in message.lower() else BLACK
+        text_color = RED if "Conflicto" in message else BLACK
+        pygame.draw.rect(screen, WHITE, (0, WINDOW_SIZE, WINDOW_SIZE, MESSAGE_HEIGHT))
         text_surf = font.render(message, True, text_color)
         text_rect = text_surf.get_rect(center=(WINDOW_SIZE // 2, WINDOW_SIZE + MESSAGE_HEIGHT // 2))
-        # fondo blanco para mensaje
-        pygame.draw.rect(screen, WHITE, (0, WINDOW_SIZE, WINDOW_SIZE, MESSAGE_HEIGHT))
         screen.blit(text_surf, text_rect)
 
         pygame.display.flip()
