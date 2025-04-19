@@ -5,7 +5,7 @@ from server.db import init_db, Session
 from server.models import ResultadoNReinas, ResultadoKnightTour, ResultadoHanoi
 from datetime import datetime
 
-HOST = "0.0.0.0"  # cualquier interfaz
+HOST = "0.0.0.0"
 PORT = 5000
 BUFFER_SIZE = 4096
 SEPARATOR = "\n"
@@ -22,6 +22,7 @@ def handle_client(conn, addr):
             line, buffer = buffer.split(SEPARATOR, 1)
             try:
                 msg = json.loads(line)
+                print(f"[DEBUG] Mensaje recibido: {msg}")
                 acción = msg.get("acción")
                 
                 if acción == "guardar_resultado":
@@ -52,7 +53,7 @@ def handle_client(conn, addr):
                     "error": {"code":500, "mensaje": str(e)},
                     "timestamp": datetime.utcnow().isoformat() + "Z"
                 }
-            conn.sendall((json.dumps(resp) + SEPARATOR).encode("utf-8"))
+            conn.sendall((json.dumps(resp) + SEPARATOR).encode('utf-8'))
     conn.close()
     print(f"[-] Conexión cerrada {addr}")
 
@@ -60,35 +61,41 @@ def salvar_resultado(msg: dict):
     juego = msg["juego"]
     datos = msg["datosPartida"]
     sesión = Session()
+
+    # Convertir timestamp ISO -> datetime
+    ts = datetime.fromisoformat(msg["timestamp"].replace("Z", ""))
+
     if juego == "nreinas":
         r = ResultadoNReinas(
             N=datos["N"],
             resuelto=datos["resuelto"],
             intentos=datos["intentos"],
-            timestamp=msg["timestamp"]
+            timestamp=ts
         )
     elif juego == "caballo":
         r = ResultadoKnightTour(
-            posición_inicial=datos.get("posicion_inicial", ""),
+            posicion_inicial=datos.get("posicion_inicial", ""),
             movimientos=datos["movimientos"],
             completado=datos["completado"],
-            timestamp=msg["timestamp"]
+            timestamp=ts
         )
     elif juego == "hanoi":
         r = ResultadoHanoi(
             discos=datos["discos"],
             movimientos=datos["movimientos"],
             completado=datos["completado"],
-            timestamp=msg["timestamp"]
+            timestamp=ts
         )
     else:
         sesión.close()
         raise ValueError("Juego no reconocido")
+
+    print(f"[DEBUG] Guardando en DB: {r}")
     sesión.add(r)
     sesión.commit()
     sesión.close()
 
-def consultar_top(juego: str, limit:int=5):
+def consultar_top(juego: str, limit: int = 5):
     sesión = Session()
     if juego == "nreinas":
         q = sesión.query(ResultadoNReinas).filter_by(resuelto=True).order_by(ResultadoNReinas.intentos).limit(limit)
@@ -99,6 +106,7 @@ def consultar_top(juego: str, limit:int=5):
     else:
         sesión.close()
         raise ValueError("Juego no reconocido")
+
     resultado = [
         {col.name: getattr(r, col.name) for col in r.__table__.columns}
         for r in q
