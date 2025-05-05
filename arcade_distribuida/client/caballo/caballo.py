@@ -1,5 +1,3 @@
-# client/caballo/caballo.py
-
 import os
 import requests
 import json
@@ -33,19 +31,35 @@ OVERLAY_BG = (0, 0, 0, 180)
 
 KNIGHT_MOVES = [(2,1),(1,2),(-1,2),(-2,1),(-2,-1),(-1,-2),(1,-2),(2,-1)]
 
-# Estado de la sugerencia
 suggestion_text = None
 
 @run_async
 def solicitar_ayuda_ia(state):
     global suggestion_text
     headers = {"Authorization": f"Bearer {API_KEY}"}
+    prompt = json.dumps(state)
+    payload = {"inputs": prompt}
     try:
-        resp = requests.post(API_URL, headers=headers, json=state, timeout=10)
-        data = resp.json()
-        suggestion_text = data.get("generated_text", resp.text)
+        resp = requests.post(API_URL, headers=headers, json=payload, timeout=10)
     except Exception as e:
-        suggestion_text = f"Error IA: {e}"
+        suggestion_text = f"Error red IA: {e}"
+        return
+
+    if not resp.ok:
+        suggestion_text = f"Error IA ({resp.status_code}): {resp.text}"
+        return
+
+    try:
+        data = resp.json()
+        # Manejo de distintos formatos de respuesta
+        if isinstance(data, list) and "generated_text" in data[0]:
+            suggestion_text = data[0]["generated_text"]
+        elif "generated_text" in data:
+            suggestion_text = data["generated_text"]
+        else:
+            suggestion_text = str(data)
+    except ValueError:
+        suggestion_text = resp.text or "Respuesta vacía de IA"
 
 @run_async
 def enviar_resultado(initial_pos, movimientos, completado):
@@ -57,20 +71,17 @@ def enviar_resultado(initial_pos, movimientos, completado):
             "movimientos": movimientos,
             "completado": completado
         },
-        "timestamp": datetime.utcnow().isoformat()+"Z"
+        "timestamp": datetime.utcnow().isoformat() + "Z"
     }
     try:
         send_and_receive(msg)
     except:
         pass
 
-def coord_to_notation(pos):
-    return f"{pos}"
-
 def main():
     global suggestion_text
     pygame.init()
-    screen = pygame.display.set_mode((WINDOW_SIZE, WINDOW_SIZE+BOTTOM_HEIGHT))
+    screen = pygame.display.set_mode((WINDOW_SIZE, WINDOW_SIZE + BOTTOM_HEIGHT))
     pygame.display.set_caption("Knight’s Tour")
     clock = pygame.time.Clock()
     font = pygame.font.SysFont(None, 24)
@@ -82,21 +93,22 @@ def main():
     finished = False
     message = "Click to choose start square"
 
-    # Botón IA
-    ayuda_rect = pygame.Rect(10, WINDOW_SIZE+5, 100, BOTTOM_HEIGHT-10)
+    ayuda_rect = pygame.Rect(10, WINDOW_SIZE + 5, 100, BOTTOM_HEIGHT - 10)
 
     while True:
         for event in pygame.event.get():
-            # cerrar sugerencia con cualquier tecla/click
+            # cerrar popup IA
             if suggestion_text and event.type in (pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN):
                 suggestion_text = None
+
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
+
             elif event.type == pygame.MOUSEBUTTONDOWN and not finished:
-                mx,my = event.pos
-                if mx>=ayuda_rect.x and my>=ayuda_rect.y and ayuda_rect.collidepoint(mx,my):
-                    # construir estado y solicitar IA
+                mx, my = event.pos
+                # Botón IA
+                if ayuda_rect.collidepoint(mx, my):
                     state = {
                         "juego": "caballo",
                         "estado": {
@@ -106,74 +118,74 @@ def main():
                         }
                     }
                     solicitar_ayuda_ia(state)
-                elif my <= WINDOW_SIZE:
-                    x,y = mx//TILE_SIZE, my//TILE_SIZE
-                    if initial_pos is None:
-                        initial_pos = (x,y)
-                        current_pos = (x,y)
-                        visited.add(current_pos)
-                        move_count=0
-                        message="Movimientos: 0"
-                    else:
-                        dx,dy = x-current_pos[0], y-current_pos[1]
-                        if (dx,dy) in KNIGHT_MOVES and (x,y) not in visited:
-                            current_pos=(x,y)
-                            visited.add(current_pos)
-                            move_count+=1
-                            message=f"Movimientos: {move_count}"
-                        else:
-                            message="Movimiento inválido"
 
-        # Fin de juego
+                elif my <= WINDOW_SIZE:
+                    x, y = mx // TILE_SIZE, my // TILE_SIZE
+                    if initial_pos is None:
+                        initial_pos = (x, y)
+                        current_pos = (x, y)
+                        visited.add(current_pos)
+                        move_count = 0
+                        message = "Movimientos: 0"
+                    else:
+                        dx, dy = x - current_pos[0], y - current_pos[1]
+                        if (dx, dy) in KNIGHT_MOVES and (x, y) not in visited:
+                            current_pos = (x, y)
+                            visited.add(current_pos)
+                            move_count += 1
+                            message = f"Movimientos: {move_count}"
+                        else:
+                            message = "Movimiento inválido"
+
+        # detección de fin
         if initial_pos and not finished:
-            if len(visited)==BOARD_SIZE*BOARD_SIZE:
-                finished=True
-                message="¡Completado!"
+            if len(visited) == BOARD_SIZE * BOARD_SIZE:
+                finished = True
+                message = "¡Completado!"
                 enviar_resultado(initial_pos, move_count, True)
             else:
-                moves=[(current_pos[0]+dx,current_pos[1]+dy) for dx,dy in KNIGHT_MOVES
-                       if 0<=current_pos[0]+dx<BOARD_SIZE and 0<=current_pos[1]+dy<BOARD_SIZE]
+                moves = [(current_pos[0]+dx, current_pos[1]+dy) for dx, dy in KNIGHT_MOVES
+                         if 0 <= current_pos[0]+dx < BOARD_SIZE and 0 <= current_pos[1]+dy < BOARD_SIZE]
                 if all(p in visited for p in moves):
-                    finished=True
-                    message="No completado"
+                    finished = True
+                    message = "No completado"
                     enviar_resultado(initial_pos, move_count, False)
 
-        # Dibujado básico
+        # dibujado tablero
         screen.fill(BLACK)
         for r in range(BOARD_SIZE):
             for c in range(BOARD_SIZE):
-                rect=pygame.Rect(c*TILE_SIZE, r*TILE_SIZE, TILE_SIZE, TILE_SIZE)
+                rect = pygame.Rect(c*TILE_SIZE, r*TILE_SIZE, TILE_SIZE, TILE_SIZE)
                 pygame.draw.rect(screen, WHITE if (r+c)%2==0 else GRAY, rect)
-                if (c,r) in visited:
-                    pygame.draw.rect(screen, GREEN, rect.inflate(-8,-8))
+                if (c, r) in visited:
+                    pygame.draw.rect(screen, GREEN, rect.inflate(-8, -8))
         if current_pos:
-            cx,cy=current_pos
-            center=(cx*TILE_SIZE+TILE_SIZE//2, cy*TILE_SIZE+TILE_SIZE//2)
+            cx, cy = current_pos
+            center = (cx*TILE_SIZE + TILE_SIZE//2, cy*TILE_SIZE + TILE_SIZE//2)
             pygame.draw.circle(screen, BLUE, center, TILE_SIZE//3)
 
-        # Mensaje
-        text_surf=font.render(message,True,RED if "inválido" in message.lower() else BLACK)
-        screen.fill(WHITE,(0,WINDOW_SIZE,WINDOW_SIZE,BOTTOM_HEIGHT))
-        screen.blit(text_surf,(WINDOW_SIZE//2 - text_surf.get_width()//2, WINDOW_SIZE+10))
+        # mensaje inferior
+        screen.fill(WHITE, (0, WINDOW_SIZE, WINDOW_SIZE, BOTTOM_HEIGHT))
+        txt = font.render(message, True, RED if "inválido" in message.lower() else BLACK)
+        screen.blit(txt, (WINDOW_SIZE//2 - txt.get_width()//2, WINDOW_SIZE+10))
 
-        # Botón IA
+        # botón IA
         pygame.draw.rect(screen, BUTTON_BG, ayuda_rect)
-        ia_txt=font.render("Ayuda IA",True,BUTTON_FG)
-        screen.blit(ia_txt,(ayuda_rect.x+5,ayuda_rect.y+5))
+        ia_txt = font.render("Ayuda IA", True, BUTTON_FG)
+        screen.blit(ia_txt, (ayuda_rect.x+5, ayuda_rect.y+5))
 
-        # Popup de sugerencia
+        # popup IA
         if suggestion_text:
-            overlay=pygame.Surface((WINDOW_SIZE, WINDOW_SIZE+BOTTOM_HEIGHT), pygame.SRCALPHA)
+            overlay = pygame.Surface((WINDOW_SIZE, WINDOW_SIZE+BOTTOM_HEIGHT), pygame.SRCALPHA)
             overlay.fill(OVERLAY_BG)
-            screen.blit(overlay,(0,0))
-            lines = suggestion_text.split("\n")
-            y0=50
-            for line in lines:
-                surf = font.render(line,True,WHITE)
-                screen.blit(surf,(20,y0))
-                y0+=30
-            tip=font.render("Pulsa cualquier tecla para cerrar",True,WHITE)
-            screen.blit(tip,(20,y0+20))
+            screen.blit(overlay, (0, 0))
+            y0 = 50
+            for line in suggestion_text.split("\n"):
+                surf = font.render(line, True, WHITE)
+                screen.blit(surf, (20, y0))
+                y0 += 30
+            tip = font.render("Pulsa cualquier tecla para cerrar", True, WHITE)
+            screen.blit(tip, (20, y0+20))
 
         pygame.display.flip()
         clock.tick(FPS)
