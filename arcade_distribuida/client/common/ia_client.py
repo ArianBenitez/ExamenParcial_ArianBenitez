@@ -1,9 +1,28 @@
+# client/common/ia_client.py
+
 import json
 import threading
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
-# Pipeline local de DialoGPT-medium
 _local_pipe = None
+
+# Mensaje guía más directo
+INITIAL_INSTRUCTION = (
+    "Eres un asistente útil. "
+    "Responde de forma concisa y concreta."
+)
+
+PIPELINE_CONFIG = {
+    "do_sample": True,
+    "top_p": 0.9,
+    "temperature": 0.7,
+    "return_full_text": False
+}
+
+CALL_CONFIG = {
+    "max_new_tokens": 25,
+    "truncation": True,
+}
 
 def _get_pipe():
     global _local_pipe
@@ -14,28 +33,38 @@ def _get_pipe():
             "text-generation",
             model=model,
             tokenizer=tokenizer,
-            max_length=100,
-            do_sample=True,
-            top_p=0.9,
-            temperature=0.7
+            **PIPELINE_CONFIG
         )
     return _local_pipe
 
 def solicitar_sugerencia_async(input_prompt, callback):
     """
-    Lanza en hilo la generación de texto a partir de:
-    - un dict (se serializa a JSON), o
-    - una cadena ya humana (se usa tal cual).
-    Luego llama a callback(text).
+    input_prompt: str o dict.
+      - str: prompt humano
+      - dict: se serializa a JSON
+    callback(text): se llama con la respuesta generada
     """
-    # El prompt puede venir como dict o str
-    prompt = json.dumps(input_prompt) if isinstance(input_prompt, dict) else input_prompt
+    # Construir prompt completo
+    if isinstance(input_prompt, str):
+        full_prompt = INITIAL_INSTRUCTION + "\n" + input_prompt
+    else:
+        full_prompt = INITIAL_INSTRUCTION + "\n" + json.dumps(input_prompt)
 
     def job():
         pipe = _get_pipe()
-        out = pipe(prompt, num_return_sequences=1)
-        text = out[0]["generated_text"]
-        callback(text)
+        out = pipe(full_prompt, **CALL_CONFIG)
+        raw = out[0]["generated_text"].strip()
+
+        # Nos quedamos sólo con la primera línea, así rompemos bucles
+        first_line = raw.split("\n", 1)[0].strip()
+
+        # Si está vacío o coincide con parte del prompt, devolvemos fallback
+        if not first_line or first_line.lower() in full_prompt.lower():
+            result = "Lo siento, no puedo sugerir nada más ahora."
+        else:
+            result = first_line
+
+        callback(result)
 
     t = threading.Thread(target=job, daemon=True)
     t.start()

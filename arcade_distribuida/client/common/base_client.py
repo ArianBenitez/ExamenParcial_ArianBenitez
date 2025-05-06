@@ -1,5 +1,8 @@
+# client/common/base_client.py
+
 import pygame
 import sys
+import time
 from datetime import datetime
 from client.nreinas.nreinas import main as nreinas_main
 from client.caballo.caballo import main as caballo_main
@@ -25,10 +28,6 @@ GAMES = {
 }
 
 def show_menu(options, title="Menú", prompt=None):
-    """
-    Muestra un menú con las opciones dadas y devuelve la seleccionada.
-    Cierra pygame justo antes de devolver.
-    """
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     pygame.display.set_caption(title)
@@ -42,7 +41,7 @@ def show_menu(options, title="Menú", prompt=None):
             if evt.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            elif evt.type == pygame.KEYDOWN:
+            if evt.type == pygame.KEYDOWN:
                 if evt.key == pygame.K_DOWN:
                     selected = (selected + 1) % len(options)
                 elif evt.key == pygame.K_UP:
@@ -54,30 +53,20 @@ def show_menu(options, title="Menú", prompt=None):
 
         screen.fill((30, 30, 30))
         if message:
-            msg_surf = font.render(message, True, (200, 200, 200))
-            msg_rect = msg_surf.get_rect(center=(WINDOW_WIDTH//2, 50))
-            screen.blit(msg_surf, msg_rect)
-
-        for idx, opt in enumerate(options):
-            color = (255, 255, 0) if idx == selected else (255, 255, 255)
+            msg_surf = font.render(message, True, (200,200,200))
+            screen.blit(msg_surf, msg_surf.get_rect(center=(WINDOW_WIDTH//2,50)))
+        for i,opt in enumerate(options):
+            color = (255,255,0) if i==selected else (255,255,255)
             txt = font.render(opt, True, color)
-            rect = txt.get_rect(center=(WINDOW_WIDTH // 2,
-                                        WINDOW_HEIGHT // 2 + idx * 50 - 50))
-            screen.blit(txt, rect)
-
+            screen.blit(txt, txt.get_rect(center=(WINDOW_WIDTH//2, WINDOW_HEIGHT//2 + i*50 - 50)))
         pygame.display.flip()
         clock.tick(FPS)
 
 def display_top_times(game_key):
-    """
-    Consulta al servidor los mejores tiempos para el juego indicado
-    y los muestra en pantalla tipo tabla con fuente monoespaciada.
-    """
-    # Petición al servidor
     msg = {
         "juego": GAMES[game_key],
         "acción": "solicitar_mejores",
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.utcnow().isoformat()+"Z"
     }
     try:
         resp = send_and_receive(msg)
@@ -86,79 +75,77 @@ def display_top_times(game_key):
         mejores = []
         error_text = f"Error de red: {e}"
 
-    # Preparar líneas de la “tabla”
-    header = []
-    rows = []
+    header, rows = [], []
     if mejores:
-        if game_key == "NReinas":
+        if game_key=="NReinas":
             header = ["#"," N ","Intentos"," Fecha"]
-            for i, entry in enumerate(mejores, start=1):
-                rows.append(f"{i:>2}   {entry['N']:<3}     {entry['intentos']:<8} {entry['timestamp']}")
+            for i,ent in enumerate(mejores,1):
+                rows.append(f"{i:>2}   {ent['N']:<3}     {ent['intentos']:<8} {ent['timestamp']}")
         else:
             header = ["#","Movs"," Fecha"]
-            for i, entry in enumerate(mejores, start=1):
-                movs = entry.get("movimientos", entry.get("intentos", "?"))
-                rows.append(f"{i:>2}   {movs:<5}  {entry['timestamp']}")
+            for i,ent in enumerate(mejores,1):
+                movs = ent.get("movimientos", ent.get("intentos","?"))
+                rows.append(f"{i:>2}   {movs:<5}  {ent['timestamp']}")
     else:
         header = ["No hay datos de mejores tiempos."]
         if 'error_text' in locals():
             rows = [error_text]
 
-    # Mostrar en Pygame
     pygame.init()
-    screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+    screen = pygame.display.set_mode((WINDOW_WIDTH,WINDOW_HEIGHT))
     pygame.display.set_caption(f"Top 5 – {game_key}")
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont("Courier", 24)  # monoespaciada
+    font = pygame.font.SysFont("Courier",24)
 
     while True:
         for evt in pygame.event.get():
             if evt.type in (pygame.QUIT, pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN):
                 pygame.quit()
                 return
-
-        screen.fill((30, 30, 30))
-        y = 20
-
-        # Render encabezado si hay filas
+        screen.fill((30,30,30))
+        y=20
         if rows:
-            hdr_surf = font.render("  ".join(header), True, (255, 215, 0))
-            screen.blit(hdr_surf, (20, y))
-            y += 40
-
-        # Render filas
+            hdr = "  ".join(header)
+            screen.blit(font.render(hdr,True,(255,215,0)), (20,y))
+            y+=40
         for line in rows:
-            txt_surf = font.render(line, True, (255, 255, 255))
-            screen.blit(txt_surf, (20, y))
-            y += 30  # espacio vertical entre filas
-
-        # Pie indicación
-        tip = font.render("Pulsa cualquier tecla para volver", True, (200, 200, 200))
-        screen.blit(tip, (20, WINDOW_HEIGHT - 40))
-
+            screen.blit(font.render(line,True,(255,255,255)), (20,y))
+            y+=30
+        tip = "Pulsa cualquier tecla para volver"
+        screen.blit(font.render(tip,True,(200,200,200)), (20,WINDOW_HEIGHT-40))
         pygame.display.flip()
         clock.tick(FPS)
 
 def run_menu():
     while True:
         choice = show_menu(MAIN_OPTIONS, title="Máquina Arcade Distribuida")
-        if choice == "NReinas":
-            nreinas_main()
-        elif choice == "Knight’s Tour":
-            caballo_main()
-        elif choice == "Torres de Hanói":
-            hanoi_main()
-        elif choice == "Ver mejores tiempos":
+        if choice=="NReinas":
+            try:
+                nreinas_main()
+            except Exception as e:
+                print("Error en N-Reinas:", e, file=sys.stderr)
+                time.sleep(2)
+        elif choice=="Knight’s Tour":
+            try:
+                caballo_main()
+            except Exception as e:
+                print("Error en Knight’s Tour:", e, file=sys.stderr)
+                time.sleep(2)
+        elif choice=="Torres de Hanói":
+            try:
+                hanoi_main()
+            except Exception as e:
+                print("Error en Torres de Hanói:", e, file=sys.stderr)
+                time.sleep(2)
+        elif choice=="Ver mejores tiempos":
             sel = show_menu(
-                ["NReinas", "Knight’s Tour", "Torres de Hanói", "Volver"],
-                title="Selecciona juego",
-                prompt="Consultar top 5"
+                ["NReinas","Knight’s Tour","Torres de Hanói","Volver"],
+                title="Selecciona juego", prompt="Consultar top 5"
             )
             if sel in GAMES:
                 display_top_times(sel)
-            # si sel == "Volver", regresa automáticamente
-        else:  # "Salir"
+        else:
             sys.exit()
 
-if __name__ == "__main__":
+if __name__=="__main__":
     run_menu()
