@@ -1,2 +1,6 @@
 pygame
 sqlalchemy
+requests
+transformers
+torch
+pytest
